@@ -161,7 +161,7 @@ class TermPlotter:
 
     reset_escape_code = "\u001b[0m"
 
-    def __init__(self,colour_map,missing_colour,x_dimension,y_dimension,plot_width,plot_height,min_value,max_value):
+    def __init__(self,colour_map,missing_colour,x_dimension,y_dimension,plot_width,plot_height,min_value,max_value,flip):
         """
         Create a TerminalPlotter.  Call the plot method of a TerminalPlotter instance to generate plots.
 
@@ -173,6 +173,7 @@ class TermPlotter:
         :param plot_height: the height of the plot (or None to automatically select)
         :param min_value: the minimum value to plot on the colour scale (or None to automatically select)
         :param plot_height: the maximum value to plot on the colour scale (or None to automatically select)
+        :param flip: set to true if the first rows in the image should appear at the bottom of the plot
         """
         self.colour_map = colour_map
         self.cached_colours = {} # mapping from (r,g,b) fractions to the closest ANSI colours
@@ -201,6 +202,7 @@ class TermPlotter:
                 self.plot_height = tsize.lines - 1
             if not self.plot_width:
                 self.plot_width = tsize.columns - 1
+        self.flip = flip
 
     def plot(self,ds,var_names):
         """
@@ -230,26 +232,32 @@ class TermPlotter:
 
         self.cbar = ""
         for index in range(self.map_colour_count):
-            self.cbar += self.getColourSpace(index)
+            self.cbar += self.getColouredString(self.getColourCode(index))
         self.cbar += TermPlotter.reset_escape_code
 
         s = ""
         for y in range(0, height):
+            last_code = None
             for x in range(0, width):
                 v = data[y, x]
                 if math.isnan(v):
-                    s += self.getColouredString(self.missing_colour_code)
+                    code = self.missing_colour_code
                 else:
                     index = math.floor(self.map_colour_count * v)
                     if index < 0:
                         index = 0
                     elif index >= self.map_colour_count:
                         index = self.map_colour_count - 1
-                    s += self.getColourSpace(index)
+                    code = self.getColourCode(index)
+                if last_code is not None and code == last_code:
+                    s += " "
+                else:
+                    s += self.getColouredString(code)
+                    last_code = code
             s += TermPlotter.reset_escape_code
             s += "\n"
         s += "\n"
-        s += "%s (w:%d,h:%d) [%f %s %f] [NaN: %.3f%% %s]" % (
+        s += "%s (w:%d,h:%d) [%f %s %f] [missing: %.3f%% %s]" % (
             var_name, original_width, original_height,
             minval, self.cbar, maxval, 100 * nan_fraction,
             self.getColouredString(self.missing_colour_code, s=" ", reset=True))
@@ -275,16 +283,21 @@ class TermPlotter:
 
         s = ""
         for y in range(0, height):
+            last_code = None
             for x in range(0, width):
                 rv = channels[0][3][y, x]
                 gv = channels[1][3][y, x]
                 bv = channels[2][3][y, x]
 
                 if math.isnan(rv) or math.isnan(gv) or math.isnan(bv):
-                    s += self.getColouredString(self.missing_colour_code)
+                    code = self.missing_colour_code
                 else:
-                    i = self.getClosestColourCode(255*quantize(rv),255*quantize(gv),255*quantize(bv))
-                    s += self.getColouredString(i)
+                    code = self.getClosestColourCode(255*quantize(rv),255*quantize(gv),255*quantize(bv))
+                if last_code is not None and code == last_code:
+                    s += " " # continue using the current colour
+                else:
+                    s += self.getColouredString(code)
+                    last_code = code
             s += TermPlotter.reset_escape_code
             s += "\n"
         return s
@@ -339,17 +352,19 @@ class TermPlotter:
         if y_index > x_index:
             data = np.transpose(data)
 
+        if self.flip:
+            data = np.flipud(data)
+
         return (nan_fraction,minval,maxval,data,original_height,original_width)
 
-    def getColourSpace(self,index):
+    def getColourCode(self,index):
         """
-        gets a space character preceeded by an ansi control code that sets the background colour
+        gets an ansi control code that sets the background colour close to a colour map index
         :param index: the index into the selected colour map
-        :return: a string which prints the background-coloured space, using the closest available colour in the ANSI palette
+        :return: the ansi colour code that most closely matches the index into the colour map
         """
         r, g, b = TermPlotter.simplified_colour_maps[self.colour_map][index]
-        code = self.getClosestColourCode(int(255 * r), int(255 * g), int(255 * b))
-        return self.getColouredString(code)
+        return self.getClosestColourCode(int(255 * r), int(255 * g), int(255 * b))
 
     def getColouredString(self,ansi_colour_code,s=" ",reset=False):
         """
@@ -389,15 +404,16 @@ class TermPlotter:
 
 
 if __name__ == '__main__':
+
     import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Utility for plotting 2d data from netcdf4 file to a 256-colour terminal window.  Requires xarray+netcdf4.")
     parser.add_argument("input_path", help="path to a netcdf4 file")
     parser.add_argument("x_dimension", help="the dimension to plot on the x-axis")
     parser.add_argument("y_dimension", help="the dimension to plot on the y-axis")
     parser.add_argument("variable_names", help="the variable name(s) to plot", nargs="+")
     parser.add_argument("--colour-map",
                         help="choose the colour map from viridis, magma, plasma, inferno, or rgb (in rgb, specify exactly 3 variable names to provide the r,g and b channel values to create a single plot)", default="viridis")
-    parser.add_argument("--nan-colour",
+    parser.add_argument("--missing-colour",
                         help="set the name of a colour to represent NaN values", default="black")
     parser.add_argument("--plot-width",
                         help="set width of the plot in characters, by default uses the entire terminal width",type=int)
@@ -407,12 +423,22 @@ if __name__ == '__main__':
                         help="set minimum value on the colour scale",type=float)
     parser.add_argument("--max-value",
                         help="set the maximum value on the colour scale",type=float)
+    parser.add_argument("--flip",action="store_true",help="specify the first rows in the image should appear at the bottom of the plot, not the top")
+    parser.add_argument("--nocheck", action="store_true",
+                        help="ignore result of checking if the terminal supports 256 colours")
+
 
     args = parser.parse_args()
 
+    if os.getenv("TERM") != "xterm-256color":
+        print(("WARNING: " if args.nocheck else "ERROR: ") + "terminal does not appear to support 256 colours.")
+        if not args.nocheck:
+            sys.exit(-1)
+
+
     ds = xr.open_dataset(args.input_path)
 
-    tp = TermPlotter(args.colour_map,args.nan_colour,args.x_dimension,args.y_dimension,args.plot_width,args.plot_height,args.min_value,args.max_value)
+    tp = TermPlotter(args.colour_map,args.missing_colour,args.x_dimension,args.y_dimension,args.plot_width,args.plot_height,args.min_value,args.max_value,args.flip)
     print(tp.plot(ds,args.variable_names))
 
 
