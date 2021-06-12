@@ -16,6 +16,9 @@ Example:
 python termplot2d.py sst_data.nc lon lat sst
 ```
 
+![termplot2d](https://user-images.githubusercontent.com/58978249/121785364-53c4fa00-cbb1-11eb-9a00-7c5241011e42.png)
+
+
 The resulting plot is written to the terminal and is sized to fit the terminal by default:
 
 ## all options
