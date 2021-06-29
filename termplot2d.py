@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2021 Niall McCarroll
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
 
 import numpy as np
@@ -8,72 +30,10 @@ import sys
 
 class TermPlotter:
 
-    # Continuous colour maps from matplotlib
-    # https://bids.github.io/colormap/
-    # https://github.com/BIDS/colormap/blob/master/colormaps.py
+    default_colour_map = ["blue","green","red"]
 
-    # License regarding the Viridis, Magma, Plasma and Inferno colormaps:
-    # New matplotlib colormaps by Nathaniel J. Smith, Stefan van der Walt,
-    # and (in the case of viridis) Eric Firing.
-    #
-    # The Viridis, Magma, Plasma, and Inferno colormaps are released under the
-    # CC0 license / public domain dedication. We would appreciate credit if you
-    # use or redistribute these colormaps, but do not impose any legal
-    # restrictions.
-    #
-    # To the extent possible under law, the persons who associated CC0 with
-    # mpl-colormaps have waived all copyright and related or neighboring rights
-    # to mpl-colormaps.
-    #
-    # You should have received a copy of the CC0 legalcode along with this
-    # work.  If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
-
-    simplified_colour_maps = {
-        "magma": [(0.001462, 0.000466, 0.013866), (0.013708, 0.011771, 0.068667), (0.039608, 0.031090, 0.133515),
-                  (0.074257, 0.052017, 0.202660), (0.113094, 0.065492, 0.276784), (0.159018, 0.068354, 0.352688),
-                  (0.211718, 0.061992, 0.418647), (0.265447, 0.060237, 0.461840), (0.316654, 0.071690, 0.485380),
-                  (0.366012, 0.090314, 0.497960), (0.414709, 0.110431, 0.504662), (0.463508, 0.129893, 0.507652),
-                  (0.512831, 0.148179, 0.507648), (0.562866, 0.165368, 0.504692), (0.613617, 0.181811, 0.498536),
-                  (0.664915, 0.198075, 0.488836), (0.716387, 0.214982, 0.475290), (0.767398, 0.233705, 0.457755),
-                  (0.816914, 0.255895, 0.436461), (0.863320, 0.283729, 0.412403), (0.904281, 0.319610, 0.388137),
-                  (0.937221, 0.364929, 0.368567), (0.960949, 0.418323, 0.359630), (0.976690, 0.476226, 0.364466),
-                  (0.986700, 0.535582, 0.382210), (0.992785, 0.594891, 0.410283), (0.996096, 0.653659, 0.446213),
-                  (0.997325, 0.711848, 0.488154), (0.996898, 0.769591, 0.534892), (0.995131, 0.827052, 0.585701),
-                  (0.992440, 0.884330, 0.640099), (0.989434, 0.941470, 0.697519)],
-        "inferno": [(0.001462, 0.000466, 0.013866), (0.013995, 0.011225, 0.071862), (0.042253, 0.028139, 0.141141),
-                    (0.081962, 0.043328, 0.215289), (0.129285, 0.047293, 0.290788), (0.183429, 0.040329, 0.354971),
-                    (0.238273, 0.036621, 0.396353), (0.290763, 0.045644, 0.418637), (0.341500, 0.062325, 0.429425),
-                    (0.391453, 0.080927, 0.433109), (0.441207, 0.099338, 0.431594), (0.491022, 0.117179, 0.425552),
-                    (0.540920, 0.134729, 0.415123), (0.590734, 0.152563, 0.400290), (0.640135, 0.171438, 0.381065),
-                    (0.688653, 0.192239, 0.357603), (0.735683, 0.215906, 0.330245), (0.780517, 0.243327, 0.299523),
-                    (0.822386, 0.275197, 0.266085), (0.860533, 0.311892, 0.230606), (0.894305, 0.353399, 0.193584),
-                    (0.923215, 0.399359, 0.155193), (0.946965, 0.449191, 0.115272), (0.965397, 0.502249, 0.073859),
-                    (0.978422, 0.557937, 0.034931), (0.985952, 0.615750, 0.025592), (0.987874, 0.675267, 0.065257),
-                    (0.984075, 0.736087, 0.129527), (0.974638, 0.797692, 0.206332), (0.960626, 0.859069, 0.298010),
-                    (0.947594, 0.917399, 0.410665), (0.954529, 0.965896, 0.540361)],
-        "plasma": [(0.050383, 0.029803, 0.527975), (0.132381, 0.022258, 0.563250), (0.193374, 0.018354, 0.590330),
-                   (0.248032, 0.014439, 0.612868), (0.299855, 0.009561, 0.631624), (0.350150, 0.004382, 0.646298),
-                   (0.399411, 0.000859, 0.656133), (0.447714, 0.002080, 0.660240), (0.494877, 0.011990, 0.657865),
-                   (0.540570, 0.034950, 0.648640), (0.584391, 0.068579, 0.632812), (0.625987, 0.103312, 0.611305),
-                   (0.665129, 0.138566, 0.585582), (0.701769, 0.174005, 0.557296), (0.736019, 0.209439, 0.527908),
-                   (0.768090, 0.244817, 0.498465), (0.798216, 0.280197, 0.469538), (0.826588, 0.315714, 0.441316),
-                   (0.853319, 0.351553, 0.413734), (0.878423, 0.387932, 0.386600), (0.901807, 0.425087, 0.359688),
-                   (0.923287, 0.463251, 0.332801), (0.942598, 0.502639, 0.305816), (0.959424, 0.543431, 0.278701),
-                   (0.973416, 0.585761, 0.251540), (0.984199, 0.629718, 0.224595), (0.991365, 0.675355, 0.198453),
-                   (0.994474, 0.722691, 0.174381), (0.993033, 0.771720, 0.154808), (0.986509, 0.822401, 0.143557),
-                   (0.974443, 0.874622, 0.144061), (0.956808, 0.928152, 0.152409)],
-        "viridis": [(0.267004, 0.004874, 0.329415), (0.277018, 0.050344, 0.375715), (0.282327, 0.094955, 0.417331),
-                    (0.282884, 0.135920, 0.453427), (0.278826, 0.175490, 0.483397), (0.270595, 0.214069, 0.507052),
-                    (0.258965, 0.251537, 0.524736), (0.244972, 0.287675, 0.537260), (0.229739, 0.322361, 0.545706),
-                    (0.214298, 0.355619, 0.551184), (0.199430, 0.387607, 0.554642), (0.185556, 0.418570, 0.556753),
-                    (0.172719, 0.448791, 0.557885), (0.160665, 0.478540, 0.558115), (0.149039, 0.508051, 0.557250),
-                    (0.137770, 0.537492, 0.554906), (0.127568, 0.566949, 0.550556), (0.120565, 0.596422, 0.543611),
-                    (0.120638, 0.625828, 0.533488), (0.132268, 0.655014, 0.519661), (0.157851, 0.683765, 0.501686),
-                    (0.196571, 0.711827, 0.479221), (0.246070, 0.738910, 0.452024), (0.304148, 0.764704, 0.419943),
-                    (0.369214, 0.788888, 0.382914), (0.440137, 0.811138, 0.340967), (0.515992, 0.831158, 0.294279),
-                    (0.595839, 0.848717, 0.243329), (0.678489, 0.863742, 0.189503), (0.762373, 0.876424, 0.137064),
-                    (0.845561, 0.887322, 0.099702), (0.926106, 0.897330, 0.104071)]
-    }
+    default_x = ["lon","longitude","x"]
+    default_y = ["lat", "latitude","y"]
 
     ansi_colours = [(0, 0, 0), (128, 0, 0), (0, 128, 0), (128, 128, 0), (0, 0, 128), (128, 0, 128), (0, 128, 128),
                     (192, 192, 192), (128, 128, 128), (255, 0, 0), (0, 255, 0), (255, 255, 0), (0, 0, 255),
@@ -161,11 +121,12 @@ class TermPlotter:
 
     reset_escape_code = "\u001b[0m"
 
-    def __init__(self,colour_map,missing_colour,x_dimension,y_dimension,plot_width,plot_height,min_value,max_value,flip):
+    def __init__(self,ds,colour_map,missing_colour,x_dimension,y_dimension,plot_width,plot_height,min_value,max_value,flip):
         """
         Create a TerminalPlotter.  Call the plot method of a TerminalPlotter instance to generate plots.
 
-        :param colour_map: the name of the colour map to use, one of (viridis,plasma,magma,inferno,rgb)
+        :param ds: an xarray dataset
+        :param colour_map: the name of the colour map to use, either comma separated colour list or "rgb"
         :param missing_colour: name of a colour to represent a missing value
         :param x_dimension: the name of the dimension to plot on the x-axis
         :param y_dimension: the name of the dimension to plot on the y-axis
@@ -175,6 +136,7 @@ class TermPlotter:
         :param plot_height: the maximum value to plot on the colour scale (or None to automatically select)
         :param flip: set to true if the first rows in the image should appear at the bottom of the plot
         """
+        self.ds = ds
         self.colour_map = colour_map
         self.cached_colours = {} # mapping from (r,g,b) fractions to the closest ANSI colours
         self.data = None
@@ -182,7 +144,32 @@ class TermPlotter:
         self.width = None
         self.x_dimension = x_dimension
         self.y_dimension = y_dimension
-        self.map_colour_count = len(TermPlotter.simplified_colour_maps[self.colour_map]) if self.colour_map != "rgb" else 0
+
+        # if x and y dimensions are not defined, try to guess them
+        if self.x_dimension == "":
+            for x_dimension in TermPlotter.default_x:
+                if x_dimension in self.ds.variables:
+                    self.x_dimension = x_dimension
+                    break
+
+        if self.y_dimension == "":
+            for y_dimension in TermPlotter.default_y:
+                if y_dimension in self.ds.variables:
+                    self.y_dimension = y_dimension
+                    break
+
+        if self.x_dimension == "":
+            print("Unable to guess x-dimension, please specify using -x/--x-dimension")
+            sys.exit(-1)
+
+        if self.y_dimension == "":
+            print("Unable to guess y-dimension, please specify using -y/--y-dimension")
+            sys.exit(-1)
+
+        if self.colour_map != "rgb":
+            self.compute_colour_scale(32)
+        else:
+            self.colour_scale = None
 
         if missing_colour in TermPlotter.webcolors:
             (r,g,b) = TermPlotter.webcolors[missing_colour]
@@ -190,6 +177,7 @@ class TermPlotter:
         else:
             print("colour to represent missing (%s) not recognized, using black"%(missing_colour))
             self.missing_color_code = 0
+
         self.nan_fraction = 0.0
         self.plot_width = plot_width
         self.plot_height = plot_height
@@ -204,20 +192,45 @@ class TermPlotter:
                 self.plot_width = tsize.columns - 1
         self.flip = flip
 
-    def plot(self,ds,var_names):
+    def compute_colour_scale(self,colour_count):
+        """
+        Compute a graduated colour scale from a list of colours
+        :param colour_count: the number of graduations
+        """
+        colours = self.colour_map.split(",")
+        colours_rgb = []
+        for colour in colours:
+            (r,g,b) = TermPlotter.webcolors.get(colour)
+            colours_rgb.append((r/255,g/255,b/255))
+
+        self.colour_scale = []
+        for i in range(colour_count):
+            frac = i/colour_count
+            index = math.floor((len(colours_rgb)-1)*frac)
+            (r0,g0,b0) = colours_rgb[index]
+            (r1,g1,b1) = colours_rgb[index+1]
+            frac = (frac - index/(len(colours_rgb)-1)) * (len(colours_rgb)-1)
+            self.colour_scale.append((r0+frac*(r1-r0),g0+frac*(g1-g0),b0+frac*(b1-b0)))
+
+    def plot(self,var_names):
         """
         make a plot of one or more variables
-        :param ds: an xarray dataset
         :param var_names: a list of variable names to plot
         :return: the contents of the plots, concatenated if multiple plots are generated
         """
         if self.colour_map == "rgb":
-            return self.plotrgb(ds,var_names)
+            return self.plotrgb(self.ds,var_names)
 
+        if var_names == []:
+            # no variables specified, plot all variables with the specified x and y dimensions?
+            for var_name in self.ds.variables:
+                v = self.ds.variables[var_name]
+                if self.x_dimension in v.dims and self.y_dimension in v.dims:
+                    var_names.append(var_name)
         plots = []
         for var_name in var_names:
-            plots.append(self.plotvar(ds,var_name))
-        return "\n\n".join(plots)
+            plots.append(self.plotvar(self.ds,var_name))
+        return plots
 
     def plotvar(self,ds,var_name):
         """
@@ -231,7 +244,7 @@ class TermPlotter:
         (height, width) = data.shape
 
         self.cbar = ""
-        for index in range(self.map_colour_count):
+        for index in range(len(self.colour_scale)):
             self.cbar += self.getColouredString(self.getColourCode(index))
         self.cbar += TermPlotter.reset_escape_code
 
@@ -243,11 +256,7 @@ class TermPlotter:
                 if math.isnan(v):
                     code = self.missing_colour_code
                 else:
-                    index = math.floor(self.map_colour_count * v)
-                    if index < 0:
-                        index = 0
-                    elif index >= self.map_colour_count:
-                        index = self.map_colour_count - 1
+                    index = math.floor(len(self.colour_scale) * v)
                     code = self.getColourCode(index)
                 if last_code is not None and code == last_code:
                     s += " "
@@ -256,7 +265,6 @@ class TermPlotter:
                     last_code = code
             s += TermPlotter.reset_escape_code
             s += "\n"
-        s += "\n"
         s += "%s (w:%d,h:%d) [%f %s %f] [missing: %.3f%% %s]" % (
             var_name, original_width, original_height,
             minval, self.cbar, maxval, 100 * nan_fraction,
@@ -360,10 +368,14 @@ class TermPlotter:
     def getColourCode(self,index):
         """
         gets an ansi control code that sets the background colour close to a colour map index
-        :param index: the index into the selected colour map
+        :param index: the index into the colour scale
         :return: the ansi colour code that most closely matches the index into the colour map
         """
-        r, g, b = TermPlotter.simplified_colour_maps[self.colour_map][index]
+        if index < 0:
+            index = 0
+        elif index >= len(self.colour_scale):
+            index = len(self.colour_scale) - 1
+        r, g, b = self.colour_scale[index]
         return self.getClosestColourCode(int(255 * r), int(255 * g), int(255 * b))
 
     def getColouredString(self,ansi_colour_code,s=" ",reset=False):
@@ -402,17 +414,20 @@ class TermPlotter:
         self.cached_colours[(r,g,b)] = closest_index
         return closest_index
 
+    def clearTerminal(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
+
 
 if __name__ == '__main__':
 
     import argparse
     parser = argparse.ArgumentParser(description="Utility for plotting 2d data from netcdf4 file to a 256-colour terminal window.  Requires xarray+netcdf4.")
     parser.add_argument("input_path", help="path to a netcdf4 file")
-    parser.add_argument("x_dimension", help="the dimension to plot on the x-axis")
-    parser.add_argument("y_dimension", help="the dimension to plot on the y-axis")
-    parser.add_argument("variable_names", help="the variable name(s) to plot", nargs="+")
+    parser.add_argument("-x", "--x-dimension", dest="x", help="the dimension to plot on the x-axis",default="")
+    parser.add_argument("-y", "--y-dimension", dest="y", help="the dimension to plot on the y-axis",default="")
+    parser.add_argument("-v", "--variable", dest="variables", help="the variable name(s) to plot", nargs="+", default=[])
     parser.add_argument("--colour-map",
-                        help="choose the colour map from viridis, magma, plasma, inferno, or rgb (in rgb, specify exactly 3 variable names to provide the r,g and b channel values to create a single plot)", default="viridis")
+                        help="choose the colour map as either a comma separated list of colours or \"rgb\" (for rgb, specify exactly 3 variable names to provide the r,g and b channel values to create a single plot)", default="blue,green,red")
     parser.add_argument("--missing-colour",
                         help="set the name of a colour to represent NaN values", default="black")
     parser.add_argument("--plot-width",
@@ -423,7 +438,7 @@ if __name__ == '__main__':
                         help="set minimum value on the colour scale",type=float)
     parser.add_argument("--max-value",
                         help="set the maximum value on the colour scale",type=float)
-    parser.add_argument("--flip",action="store_true",help="specify the first rows in the image should appear at the bottom of the plot, not the top")
+    parser.add_argument("--flip",action="store_true",help="specify the first rows in the image should appear at the top of the plot, not the bottom")
     parser.add_argument("--nocheck", action="store_true",
                         help="ignore result of checking if the terminal supports 256 colours")
 
@@ -435,10 +450,24 @@ if __name__ == '__main__':
         if not args.nocheck:
             sys.exit(-1)
 
-
     ds = xr.open_dataset(args.input_path)
 
-    tp = TermPlotter(args.colour_map,args.missing_colour,args.x_dimension,args.y_dimension,args.plot_width,args.plot_height,args.min_value,args.max_value,args.flip)
-    print(tp.plot(ds,args.variable_names))
+    tp = TermPlotter(ds,args.colour_map,args.missing_colour,args.x,args.y,args.plot_width,args.plot_height,args.min_value,args.max_value,not args.flip)
+    plots = tp.plot(args.variables)
+
+    if len(plots) == 0:
+        print("No variables found to plot")
+
+    # print the first plot
+    if len(plots) >= 1:
+        tp.clearTerminal()
+        print(plots[0])
+
+    # print any remaining plots, waiting for key presses
+    for x in range(1,len(plots)):
+        input("Press Any Key>")
+        tp.clearTerminal()
+        print(plots[x])
+
 
 
