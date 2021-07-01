@@ -187,7 +187,7 @@ class TermPlotter:
         if not self.plot_height or not self.plot_width:
             tsize = os.get_terminal_size()
             if not self.plot_height:
-                self.plot_height = tsize.lines - 1
+                self.plot_height = tsize.lines - 2
             if not self.plot_width:
                 self.plot_width = tsize.columns - 1
         self.flip = flip
@@ -218,9 +218,6 @@ class TermPlotter:
         :param var_names: a list of variable names to plot
         :return: the contents of the plots, concatenated if multiple plots are generated
         """
-        if self.colour_map == "rgb":
-            return self.plotrgb(self.ds,var_names)
-
         if var_names == []:
             # no variables specified, plot all variables with the specified x and y dimensions?
             for var_name in self.ds.variables:
@@ -245,7 +242,7 @@ class TermPlotter:
 
         self.cbar = ""
         for index in range(len(self.colour_scale)):
-            self.cbar += self.getColouredString(self.getColourCode(index))
+            self.cbar += self.getColourBGString(self.getColourCode(index))
         self.cbar += TermPlotter.reset_escape_code
 
         s = ""
@@ -261,53 +258,14 @@ class TermPlotter:
                 if last_code is not None and code == last_code:
                     s += " "
                 else:
-                    s += self.getColouredString(code)
+                    s += self.getColourBGString(code)
                     last_code = code
             s += TermPlotter.reset_escape_code
             s += "\n"
         s += "%s (w:%d,h:%d) [%f %s %f] [missing: %.3f%% %s]" % (
             var_name, original_width, original_height,
             minval, self.cbar, maxval, 100 * nan_fraction,
-            self.getColouredString(self.missing_colour_code, s=" ", reset=True))
-        return s
-
-    def plotrgb(self,ds,var_names):
-        """
-        make an RGB plot using three variables to control the red,green and blue intensities separately
-
-        :param ds: the xarray dataset
-        :param var_names: a list of three variable names [red-variable,green-variable,blue-variable]
-        :return: string containing the plotted data
-        """
-        channels = []
-        for var_name in var_names:
-            (nan_fraction, minval, maxval, data, original_height, original_width) = self.loadvar(ds,var_name)
-            channels.append((nan_fraction, minval, maxval, data, original_height, original_width))
-
-        (height, width) = data.shape
-
-        # quantize the colour levels in each channel to make it faster to find equivalent ansi colours
-        quantize = lambda x: int(x*20)/20
-
-        s = ""
-        for y in range(0, height):
-            last_code = None
-            for x in range(0, width):
-                rv = channels[0][3][y, x]
-                gv = channels[1][3][y, x]
-                bv = channels[2][3][y, x]
-
-                if math.isnan(rv) or math.isnan(gv) or math.isnan(bv):
-                    code = self.missing_colour_code
-                else:
-                    code = self.getClosestColourCode(255*quantize(rv),255*quantize(gv),255*quantize(bv))
-                if last_code is not None and code == last_code:
-                    s += " " # continue using the current colour
-                else:
-                    s += self.getColouredString(code)
-                    last_code = code
-            s += TermPlotter.reset_escape_code
-            s += "\n"
+            self.getColourBGString(self.missing_colour_code, s=" ", reset=True))
         return s
 
     def loadvar(self,ds,var_name):
@@ -347,7 +305,8 @@ class TermPlotter:
 
         # if the window size in either dimension is > 1, coarsen the data
         if window_size_x > 1 or window_size_y > 1:
-            arr = arr.coarsen({self.y_dimension: window_size_y, self.x_dimension: window_size_x}, boundary="pad").mean().data
+            arr = arr.coarsen({self.y_dimension: window_size_y, self.x_dimension: window_size_x}, boundary="pad")\
+                .mean().data
 
         # work out max and min values if not specified explicitly
         maxval = self.max_value if self.max_value is not None else np.nanmax(arr)
@@ -378,7 +337,7 @@ class TermPlotter:
         r, g, b = self.colour_scale[index]
         return self.getClosestColourCode(int(255 * r), int(255 * g), int(255 * b))
 
-    def getColouredString(self,ansi_colour_code,s=" ",reset=False):
+    def getColourBGString(self,ansi_colour_code,s=" ",reset=False):
         """
         gets a background coloured string
         :param ansi_colour_code: the ansi colour code, in the range 0 to 255
@@ -421,26 +380,32 @@ class TermPlotter:
 if __name__ == '__main__':
 
     import argparse
-    parser = argparse.ArgumentParser(description="Utility for plotting 2d data from netcdf4 file to a 256-colour terminal window.  Requires xarray+netcdf4.")
+    parser = argparse.ArgumentParser(
+        description="Utility for plotting 2d data from netcdf4 file to a 256-colour terminal window. "+
+                    "Requires xarray+netcdf4.")
     parser.add_argument("input_path", help="path to a netcdf4 file")
-    parser.add_argument("-x", "--x-dimension", dest="x", help="the dimension to plot on the x-axis",default="")
-    parser.add_argument("-y", "--y-dimension", dest="y", help="the dimension to plot on the y-axis",default="")
-    parser.add_argument("-v", "--variable", dest="variables", help="the variable name(s) to plot", nargs="+", default=[])
+    parser.add_argument("-x", "--x-dimension", dest="x", metavar="<dimension>",
+                help="the dimension to plot on the x-axis",default="")
+    parser.add_argument("-y", "--y-dimension", dest="y", metavar="<dimension>",
+                help="the dimension to plot on the y-axis",default="")
+    parser.add_argument("-v", "--variable", dest="variables",
+                help="the variable name(s) to plot", nargs="+", metavar="<variable>", default=[])
     parser.add_argument("--colour-map",
-                        help="choose the colour map as either a comma separated list of colours or \"rgb\" (for rgb, specify exactly 3 variable names to provide the r,g and b channel values to create a single plot)", default="blue,green,red")
+                help="choose the colour map as a comma separated list of colours", default="blue,green,red")
     parser.add_argument("--missing-colour",
-                        help="set the name of a colour to represent NaN values", default="black")
+                help="set the name of a colour to represent NaN values", default="black")
     parser.add_argument("--plot-width",
-                        help="set width of the plot in characters, by default uses the entire terminal width",type=int)
+                help="set width of the plot in characters, by default uses the entire terminal width",type=int)
     parser.add_argument("--plot-height",
-                        help="set height of the plot in characters, by default uses the entire terminal height",type=int)
+                help="set height of the plot in characters, by default uses the entire terminal height",type=int)
     parser.add_argument("--min-value",
-                        help="set minimum value on the colour scale",type=float)
+                help="set minimum value on the colour scale",type=float)
     parser.add_argument("--max-value",
-                        help="set the maximum value on the colour scale",type=float)
-    parser.add_argument("--flip",action="store_true",help="specify the first rows in the image should appear at the top of the plot, not the bottom")
+                help="set the maximum value on the colour scale",type=float)
+    parser.add_argument("--flip",action="store_true",
+                help="specify that the first rows in the image should appear at the top of the plot, not the bottom")
     parser.add_argument("--nocheck", action="store_true",
-                        help="ignore result of checking if the terminal supports 256 colours")
+                help="ignore result of checking if the terminal supports 256 colours")
 
 
     args = parser.parse_args()
@@ -452,7 +417,12 @@ if __name__ == '__main__':
 
     ds = xr.open_dataset(args.input_path)
 
-    tp = TermPlotter(ds,args.colour_map,args.missing_colour,args.x,args.y,args.plot_width,args.plot_height,args.min_value,args.max_value,not args.flip)
+    tp = TermPlotter(ds,args.colour_map,args.missing_colour,
+                     args.x,args.y,
+                     args.plot_width,args.plot_height,
+                     args.min_value,args.max_value,
+                     not args.flip)
+
     plots = tp.plot(args.variables)
 
     if len(plots) == 0:
