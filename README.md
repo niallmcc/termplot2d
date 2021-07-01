@@ -33,19 +33,22 @@ The resulting plots are written to the terminal and is sized to fit the terminal
 To plot a single variable, use `-v` or `--variable`
 
 ```
-python termplot2d.py 20160101120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc -v analysed_sst
+python termplot2d.py 20160101120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc 
+    -v analysed_sst
 ```
 
 To control the dimension names, use `-x` and `-y`
 
 ```
-python termplot2d.py 20160101120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc -v analysed_sst -x lon -y lat
+python termplot2d.py 20160101120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc 
+    -v analysed_sst -x lon -y lat
 ```
 
 To specify a custom colour map, provide a list of colours
 
 ```
-python termplot2d.py 20160101120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc -v analysed_sst -x lon -y lat --colour-map "purple,orange,green"
+python termplot2d.py 20160101120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc 
+    -v analysed_sst -x lon -y lat --colour-map "purple,orange,green"
 ```
 
 Also:
