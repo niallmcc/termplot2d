@@ -178,7 +178,6 @@ class TermPlotter:
             print("colour to represent missing (%s) not recognized, using black"%(missing_colour))
             self.missing_color_code = 0
 
-        self.nan_fraction = 0.0
         self.plot_width = plot_width
         self.plot_height = plot_height
         self.min_value = min_value
@@ -236,15 +235,27 @@ class TermPlotter:
         :param var_name: the name of a variable within the dataset
         :return: (nan_fraction,minval,maxval,data,original_height,original_width)
         """
+        # get the dataset, normalised and coarsened to fit the terminal
         (nan_fraction,minval,maxval,data,original_height,original_width) = self.loadvar(ds,var_name)
 
         (height, width) = data.shape
 
-        self.cbar = ""
-        for index in range(len(self.colour_scale)):
-            self.cbar += self.getColourBGString(self.getColourCode(index))
-        self.cbar += TermPlotter.reset_escape_code
+        # construct the colour bar
+        def getColourBar(minval,maxval):
+            cbar = ""
+            if minval < maxval:
+                for index in range(len(self.colour_scale)):
+                    cbar += self.getColourBGString(self.getColourCode(index))
+            else:
+                # where max=min, all non-missing normalised data is set to 0.5 set the colour bar to the midpoint
+                index = math.floor(len(self.colour_scale) * 0.5)
+                code = self.getColourCode(index)
+                for index in range(len(self.colour_scale)):
+                    cbar += self.getColourBGString(code)
+            cbar += TermPlotter.reset_escape_code
+            return cbar
 
+        # construct the main plot
         s = ""
         for y in range(0, height):
             last_code = None
@@ -262,10 +273,18 @@ class TermPlotter:
                     last_code = code
             s += TermPlotter.reset_escape_code
             s += "\n"
-        s += "%s (w:%d,h:%d) [%f %s %f] [missing: %.3f%% %s]" % (
-            var_name, original_width, original_height,
-            minval, self.cbar, maxval, 100 * nan_fraction,
-            self.getColourBGString(self.missing_colour_code, s=" ", reset=True))
+
+        if math.isnan(minval) or math.isnan(maxval):
+            # corner case, all values are missing, dont show colour bar
+            s += "%s (w:%d,h:%d) [missing: %.3f%% %s]" % (
+                var_name, original_width, original_height,
+                100 * nan_fraction,
+                self.getColourBGString(self.missing_colour_code, s=" ", reset=True))
+        else:
+            s += "%s (w:%d,h:%d) [%f %s %f] [missing: %.3f%% %s]" % (
+                var_name, original_width, original_height,
+                minval, getColourBar(minval,maxval), maxval, 100 * nan_fraction,
+                self.getColourBGString(self.missing_colour_code, s=" ", reset=True))
         return s
 
     def loadvar(self,ds,var_name):
@@ -296,7 +315,7 @@ class TermPlotter:
                 lookup.append(slice(0, original_height))
         arr = variable[tuple(lookup)]
 
-        # get NaN statistics
+        # get NaN statistics before coarsening
         nan_fraction = np.count_nonzero(np.isnan(arr.data)) / (original_width * original_height)
 
         # work out the size of the window to coarsen the array
@@ -306,19 +325,27 @@ class TermPlotter:
         # if the window size in either dimension is > 1, coarsen the data
         if window_size_x > 1 or window_size_y > 1:
             arr = arr.coarsen({self.y_dimension: window_size_y, self.x_dimension: window_size_x}, boundary="pad")\
-                .mean().data
+                .mean(skipna=True).data
 
         # work out max and min values if not specified explicitly
         maxval = self.max_value if self.max_value is not None else np.nanmax(arr)
         minval = self.min_value if self.min_value is not None else np.nanmin(arr)
 
         # normalise the array so that values lie in the range 0.0 to 1.0
-        data = (arr - minval) / (maxval - minval)
+        if minval is None or maxval is None:
+            # corner case: no values in the data
+            pass
+        elif minval == maxval:
+            # edge case: only one value in the data
+            data = np.where(np.isnan(arr), arr, 0.5)
+        else:
+            data = (arr - minval) / (maxval - minval)
 
         # make sure that array is organised by [y,x]
         if y_index > x_index:
             data = np.transpose(data)
 
+        # invert the array if flip specified
         if self.flip:
             data = np.flipud(data)
 
@@ -375,6 +402,27 @@ class TermPlotter:
 
     def clearTerminal(self):
         os.system('cls' if os.name == 'nt' else 'clear')
+
+    def getKeyPress(self,prompt):
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+        if os.name == 'nt':
+            import msvcrt
+            return msvcrt.getch()
+        else:
+            import termios
+            fd = sys.stdin.fileno()
+
+            oldterm = termios.tcgetattr(fd)
+            newattr = termios.tcgetattr(fd)
+            newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
+            termios.tcsetattr(fd, termios.TCSANOW, newattr)
+            try:
+                return sys.stdin.read(1)
+            except IOError:
+                pass
+            finally:
+                termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
 
 
 if __name__ == '__main__':
@@ -435,7 +483,10 @@ if __name__ == '__main__':
 
     # print any remaining plots, waiting for key presses
     for x in range(1,len(plots)):
-        input("Press Any Key>")
+        c = tp.getKeyPress("Press Any Key (q to quit)>")
+        if c == 'q' or c == 'Q':
+            print("")
+            sys.exit(0)
         tp.clearTerminal()
         print(plots[x])
 
