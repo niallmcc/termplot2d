@@ -25,8 +25,7 @@ pip install netcdf4
 python termplot2d.py 20160101120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_CDR2.1-v02.0-fv01.0.nc
 ```
 
-![termplot2d](https://user-images.githubusercontent.com/58978249/121785364-53c4fa00-cbb1-11eb-9a00-7c5241011e42.png)
-
+![termplot2d_sst](https://user-images.githubusercontent.com/58978249/124094253-83e51780-da50-11eb-9fbc-6a6432bc4c4a.png)
 
 The resulting plots are written to the terminal and is sized to fit the terminal by default.  Press any key to move to the next plot.
 
